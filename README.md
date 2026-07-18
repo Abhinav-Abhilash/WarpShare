@@ -1,4 +1,4 @@
-# WarpShare
+# WarpShare           (read bottom please)
 # WarpShare ⚡
 
 WarpShare is an open-source, local-network AirDrop and universal clipboard built for university lecture halls and study groups. 
