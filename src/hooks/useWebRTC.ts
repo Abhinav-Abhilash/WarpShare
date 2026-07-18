@@ -300,8 +300,8 @@ export function useWebRTC(roomId: string) {
 
     channel.onbufferedamountlow = () => {
       // Resume all workers if any channel drained enough
-      fileWorkers.current.forEach(worker => {
-        worker.postMessage({ type: 'RESUME', fileId: 'all' } as WorkerMessage);
+      fileWorkers.current.forEach((worker, fileId) => {
+        worker.postMessage({ type: 'RESUME', fileId } as WorkerMessage);
       });
     };
 
