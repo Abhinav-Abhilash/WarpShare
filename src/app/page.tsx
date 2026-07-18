@@ -40,16 +40,16 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-[var(--background)]">
+    <div className="flex flex-col md:flex-row h-full w-full overflow-hidden bg-[var(--background)]">
       {/* Fixed Sidebar */}
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto px-8 py-10 sm:px-10 flex flex-col">
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:px-8 md:py-10 flex flex-col">
         {/* Room Connection Handshake Bar */}
-        <div className="flex items-center justify-between p-4 mb-8 bg-white dark:bg-[#18181B] border border-[var(--border)] rounded-[12px] shadow-sm max-w-4xl">
-          <div className="flex items-center gap-4">
-            <span className="px-3 py-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 rounded-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 mb-6 md:mb-8 bg-white dark:bg-[#18181B] border border-[var(--border)] rounded-[12px] shadow-sm max-w-4xl gap-4 sm:gap-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <span className="px-3 py-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 rounded-full w-fit">
               Room #{roomId}
             </span>
             <div className="flex items-center gap-2 text-sm">
@@ -69,7 +69,7 @@ export default function Home() {
           
           <button
             onClick={handleCopyRoom}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
+            className="flex items-center justify-center gap-2 px-3 py-1.5 w-full sm:w-auto text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
           >
             {copiedRoomId ? (
               <>
