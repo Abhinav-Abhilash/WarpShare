@@ -10,6 +10,8 @@ interface SidebarProps {
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
     // Check initial preference
@@ -27,6 +29,41 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     setIsDarkMode(!isDarkMode);
   };
 
+  useEffect(() => {
+    const savedWidth = localStorage.getItem('sidebarWidth');
+    if (savedWidth) {
+      setSidebarWidth(parseInt(savedWidth, 10));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      let newWidth = e.clientX;
+      if (newWidth < 200) newWidth = 200;
+      if (newWidth > 600) newWidth = 600;
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      localStorage.setItem('sidebarWidth', sidebarWidth.toString());
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, sidebarWidth]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+
   const navItems = [
     { id: 'broadcast', name: 'Room Broadcast', icon: Home },
     { id: 'clipboard', name: 'LAN Clipboard', icon: ClipboardList },
@@ -35,7 +72,16 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   ] as const;
 
   return (
-    <aside className="flex flex-col md:flex-col w-full md:w-64 h-auto md:h-full bg-[var(--background)] border-b md:border-b-0 md:border-r border-[var(--border)] shrink-0 z-20">
+    <aside 
+      className={`relative flex flex-col md:flex-col w-full md:w-[var(--sidebar-width)] h-auto md:h-full bg-[var(--background)] border-b md:border-b-0 border-[var(--border)] shrink-0 z-20 ${isResizing ? 'select-none' : ''}`}
+      style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
+    >
+      {/* Resizer Handle */}
+      <div 
+        className="hidden md:block absolute right-0 top-0 bottom-0 w-1 hover:w-1.5 cursor-col-resize bg-[var(--border)] hover:bg-indigo-500/50 active:bg-indigo-500 transition-colors z-30"
+        onMouseDown={handleMouseDown}
+      />
+
       {/* Brand Header */}
       <div className="flex items-center justify-between md:justify-start h-14 md:h-16 px-4 md:px-6 border-b border-[var(--border)]/50">
         <h1 className="text-base md:text-lg font-semibold tracking-tight text-[var(--foreground)]">WarpShare</h1>
