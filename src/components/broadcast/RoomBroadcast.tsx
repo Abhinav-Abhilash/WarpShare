@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Dropzone } from './Dropzone';
 import { MeshTelemetry } from './MeshTelemetry';
 import { Peer, FileTransfer } from '../../lib/types/network';
-import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { GripVertical } from "lucide-react";
 
 interface RoomBroadcastProps {
@@ -23,9 +23,9 @@ export function RoomBroadcast({ peers, transfers, startBroadcast }: RoomBroadcas
 
   return (
     <PanelGroup 
-      autoSaveId="warpshare-layout-v1" 
+      id="warpshare-layout-v1" 
       className="h-full w-full rounded-[12px] border border-[var(--border)] bg-white dark:bg-[#18181B] overflow-hidden" 
-      direction={isDesktop ? "horizontal" : "vertical"}
+      orientation={isDesktop ? "horizontal" : "vertical"}
     >
       {/* Left Panel: Primary File Drop Zone */}
       <Panel defaultSize={65} minSize={30}>
