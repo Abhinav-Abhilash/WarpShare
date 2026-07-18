@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Home, ClipboardList, Trees, Settings, Sun, Moon } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export type TabId = 'broadcast' | 'clipboard' | 'tree' | 'settings';
 
@@ -9,24 +10,19 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
-    // Check initial preference
-    if (document.documentElement.classList.contains('dark')) {
-      setIsDarkMode(true);
-    }
+    setMounted(true);
   }, []);
 
+  const isDarkMode = mounted && theme === 'dark';
+
   const toggleTheme = () => {
-    if (isDarkMode) {
-      document.documentElement.classList.remove('dark');
-    } else {
-      document.documentElement.classList.add('dark');
-    }
-    setIsDarkMode(!isDarkMode);
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   useEffect(() => {

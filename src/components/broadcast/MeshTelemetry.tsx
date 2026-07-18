@@ -31,14 +31,14 @@ export function MeshTelemetry({ peers, transfers }: MeshTelemetryProps) {
       <div className="px-5 py-3 border-b border-[var(--border)] bg-zinc-50 dark:bg-zinc-900/50">
         <h3 className="text-sm font-semibold text-[var(--foreground)]">Active Transfers ({transfers.length})</h3>
       </div>
-      
+
       <div className="flex flex-col divide-y divide-[var(--border)]/50">
         {transfers.length === 0 && (
           <div className="px-5 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
             No active transfers. Drop a file to start broadcasting.
           </div>
         )}
-        
+
         {transfers.map((transfer) => {
           // Find the peer, or mock a "Local Transfer" if we are seeding with no peers connected yet
           const peer = peers.find((p) => p.id === transfer.peerId) || {
@@ -78,8 +78,8 @@ export function MeshTelemetry({ peers, transfers }: MeshTelemetryProps) {
               {/* Progress */}
               <div className="flex justify-end w-1/3">
                 {isComplete && transfer.blobUrl ? (
-                  <a 
-                    href={transfer.blobUrl} 
+                  <a
+                    href={transfer.blobUrl}
                     download={transfer.fileName}
                     onClick={() => {
                       if (transfer.blobUrl) {
@@ -94,11 +94,10 @@ export function MeshTelemetry({ peers, transfers }: MeshTelemetryProps) {
                     Save File
                   </a>
                 ) : (
-                  <div className={`px-3 py-1 rounded-full border text-xs font-medium ${
-                    isComplete 
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-400'
-                      : 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-900/20 dark:text-indigo-400'
-                  }`}>
+                  <div className={`px-3 py-1 rounded-full border text-xs font-medium ${isComplete
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-400'
+                    : 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-900/20 dark:text-indigo-400'
+                    }`}>
                     {progressString}
                   </div>
                 )}

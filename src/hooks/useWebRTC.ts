@@ -21,6 +21,13 @@ export function useWebRTC(roomId: string) {
   const [clipboardEntries, setClipboardEntries] = useState<ClipboardEntry[]>([]);
   const [localIdStr, setLocalIdStr] = useState<string>('');
   
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      console.error("WebRTC Data Channels require a Secure Context (HTTPS or localhost).");
+      alert("Security Warning: WebRTC Data Channels require a Secure Context. Please access this app via HTTPS or localhost to ensure file transfers work correctly.");
+    }
+  }, []);
+  
   const localIdRef = useRef<string>(Math.random().toString(36).substring(2, 9));
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
   const dataChannels = useRef<Map<string, RTCDataChannel>>(new Map());

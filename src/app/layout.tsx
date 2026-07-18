@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} antialiased h-full`} suppressHydrationWarning>
       <body className="h-full bg-[var(--background)] text-[var(--foreground)] font-sans" suppressHydrationWarning>
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
