@@ -40,10 +40,26 @@ export default function RoomPage({ params }: { params: { id: string } }) {
           secure: true,
           config: {
             iceServers: [
+              // Primary STUN - Fast local Wi-Fi IP discovery
               { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" }
-            ]
-          }
+              { urls: "stun:stun1.l.google.com:19302" },
+              { urls: "stun:stun.cloudflare.com:3478" },
+              // Free OpenRelay / Public Fallback TURN & STUN (Guarantees connection on strict routers)
+              { urls: "stun:openrelay.metered.ca:80" },
+              { 
+                urls: "turn:openrelay.metered.ca:80", 
+                username: "openrelayproject", 
+                credential: "openrelayproject" 
+              },
+              { 
+                urls: "turn:openrelay.metered.ca:443", 
+                username: "openrelayproject", 
+                credential: "openrelayproject" 
+              }
+            ],
+            iceCandidatePoolSize: 10,
+          },
+          debug: 2 // Enable warning logs to catch connection drops
         };
 
         setStatus("Connecting to Matchmaker broker...");
