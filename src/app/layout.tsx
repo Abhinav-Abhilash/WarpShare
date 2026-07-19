@@ -1,33 +1,29 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import "./globals.css";
+import { ThemeProvider } from "next-themes";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
-export const metadata: Metadata = {
-  title: "WarpShare | P2P File Sharing",
-  description: "Offline-capable peer-to-peer file and text sharing for academic study groups.",
-};
+const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // Prevents iOS input zoom
-  userScalable: false,
+  maximumScale: 1,
+};
+
+export const metadata: Metadata = {
+  title: "WarpShare ⚡ Offline P2P Transfer",
+  description: "Blazing fast local network file and clipboard sharing.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased h-full`} suppressHydrationWarning>
-      <body className="h-full bg-[var(--background)] text-[var(--foreground)] font-sans" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           {children}
         </ThemeProvider>

@@ -1,57 +1,33 @@
 @import "tailwindcss";
-@custom-variant dark (&:is(.dark *));
 
-@theme {
-  /* Colors - Accents */
-  --color-indigo-muted: #4F46E5;
-  --color-sage: #10B981;
-  --color-sage-dark: #059669;
+@custom-variant dark (&:where(.dark, .dark *));
 
-  /* Colors - Semantic mapping from CSS variables */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-border: var(--border);
-
-  /* Typography */
-  --font-sans: var(--font-inter), "Inter", "Geist", "SF Pro Display", "IBM Plex Sans", sans-serif;
-
-  /* Geometry & Spacing (Strictly 10px - 14px as requested) */
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 14px;
-
-  /* Shadows */
-  --shadow-subtle: 0 1px 2px rgba(0,0,0,0.05);
-
-  /* Animations */
-  --default-transition-duration: 200ms;
-  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #4f46e5;
+  --accent-foreground: #ffffff;
 }
 
-@layer base {
-  :root {
-    /* Light Mode */
-    --background: #FAFAFA;
-    --foreground: #18181B;
-    --card: #FFFFFF;
-    --border: #E4E4E7;
-  }
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --card-foreground: #fafafa;
+  --border: #27272a;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #6366f1;
+  --accent-foreground: #ffffff;
+}
 
-  .dark {
-    /* Dark Mode */
-    --background: #09090B;
-    --foreground: #FAFAFA;
-    --card: #18181B;
-    --border: #27272A;
-  }
-
-  body {
-    background-color: var(--background);
-    color: var(--foreground);
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Apply subtle transitions globally to interactive elements if desired, though usually better explicitly via utility classes */
-  }
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
