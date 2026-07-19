@@ -190,24 +190,16 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
         pingInterval: 5000,
         config: {
           iceServers: [
+            { urls: "stun:stun.cloudflare.com:3478" },
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "stun:stun.cloudflare.com:3478" },
-            { urls: "stun:openrelay.metered.ca:80" },
-            { 
-              urls: "turn:openrelay.metered.ca:80", 
-              username: "openrelayproject", 
-              credential: "openrelayproject" 
-            },
-            { 
-              urls: "turn:openrelay.metered.ca:443", 
-              username: "openrelayproject", 
-              credential: "openrelayproject" 
-            }
+            { urls: "stun:global.stun.twilio.com:3478" }
           ],
           iceCandidatePoolSize: 10,
+          sdpSemantics: "unified-plan",
+          iceTransportPolicy: "all",
         },
-        debug: 2
+        debug: 1
       };
 
       if (addLog) addLog('Initializing WebRTC engine...');
