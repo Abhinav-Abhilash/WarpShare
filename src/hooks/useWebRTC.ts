@@ -6,7 +6,7 @@ import { useSettings } from './useSettings';
 
 const BUFFER_THRESHOLD = 1024 * 1024; // 1MB
 
-export function useWebRTC(roomId: string) {
+export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
   const { addActivity } = useKnowledgeTree();
   const { settings } = useSettings();
   const settingsRef = useRef(settings);
@@ -73,7 +73,7 @@ export function useWebRTC(roomId: string) {
       const targetId = conn.peer;
 
       conn.on('open', () => {
-        console.log(`DataConnection opened with ${targetId}`);
+        if (addLog) addLog(`DataConnection secured with peer: ${targetId}`);
         dataChannels.current.set(targetId, conn);
         
         // Exchange UI info
@@ -95,7 +95,7 @@ export function useWebRTC(roomId: string) {
       });
 
       conn.on('close', () => {
-        console.log(`DataConnection closed with ${targetId}`);
+        if (addLog) addLog(`DataConnection closed with peer: ${targetId}`);
         setPeers(prev => prev.filter(p => p.id !== targetId));
         dataChannels.current.delete(targetId);
       });
@@ -126,21 +126,30 @@ export function useWebRTC(roomId: string) {
                 speedBytesPerSecond: 0,
                 status: 'downloading'
               }]);
+              if (addLog) addLog(`Inbound file transfer started: ${msg.fileName} (${msg.totalSize} bytes)`);
             } else if (msg.type === 'CHUNK_HEADER') {
               activeChunkFileId.current = msg.fileId;
             }
           } catch (err) {
             console.error('Failed to parse text message:', err);
           }
-        } else if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
-          // Handle binary chunk
+        } else if (data instanceof ArrayBuffer || data instanceof Uint8Array || data instanceof Blob) {
+          // Handle binary chunk natively (serialization: raw)
           const fileId = activeChunkFileId.current;
           if (!fileId) return;
           
           const fileBuffer = receivedFiles.current.get(fileId);
           if (!fileBuffer) return;
           
-          const buffer = (data instanceof Uint8Array ? data.buffer : data) as ArrayBuffer;
+          let buffer: ArrayBuffer;
+          if (data instanceof Blob) {
+            // Unlikely with raw serialization in some browsers, but fallback
+            addLog && addLog('Received Blob instead of ArrayBuffer');
+            return;
+          } else {
+            buffer = (data instanceof Uint8Array ? data.buffer : data) as ArrayBuffer;
+          }
+          
           fileBuffer.chunks.push(buffer);
           fileBuffer.receivedBytes += buffer.byteLength;
           
@@ -151,6 +160,7 @@ export function useWebRTC(roomId: string) {
             const blob = new Blob(fileBuffer.chunks);
             blobUrl = URL.createObjectURL(blob);
             receivedFiles.current.delete(fileId);
+            if (addLog) addLog(`File download complete for: ${fileBuffer.fileName}`);
           }
           
           setTransfers(prev => prev.map(t => {
@@ -173,25 +183,42 @@ export function useWebRTC(roomId: string) {
       const roomPeerId = `warpshare-room-${roomId}`;
       
       const config = {
+        host: "0.peerjs.com",
+        port: 443,
+        secure: true,
+        pingInterval: 5000,
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" },
+            { urls: "stun:stun.cloudflare.com:3478" },
+            { urls: "stun:openrelay.metered.ca:80" },
+            { 
+              urls: "turn:openrelay.metered.ca:80", 
+              username: "openrelayproject", 
+              credential: "openrelayproject" 
+            },
+            { 
+              urls: "turn:openrelay.metered.ca:443", 
+              username: "openrelayproject", 
+              credential: "openrelayproject" 
+            }
           ],
           iceCandidatePoolSize: 10,
-        }
+        },
+        debug: 2
       };
+
+      if (addLog) addLog('Initializing WebRTC engine...');
 
       let p = new PeerModule(roomPeerId, config);
       
       p.on('open', (id: string) => {
         if (!isMounted) return;
-        console.log('Opened as Host:', id);
-        
-        // Add ourselves as a 'Host' peer in the UI just so guests know it's the host
+        if (addLog) addLog(`Opened as Room Host: ${id}`);
         
         p.on('connection', (conn: any) => {
+          if (addLog) addLog('Inbound connection received! Securing DataChannel...');
           setupDataConnection(conn);
         });
       });
@@ -199,20 +226,25 @@ export function useWebRTC(roomId: string) {
       p.on('error', (err: any) => {
         if (!isMounted) return;
         if (err.type === 'unavailable-id') {
-          console.log('Room taken, initializing as Guest...');
+          if (addLog) addLog('Room taken, initializing as Guest Mode...');
           const guestPeer = new PeerModule(config);
           peerRef.current = guestPeer;
           
           guestPeer.on('open', (guestId: string) => {
-             const conn = guestPeer.connect(roomPeerId, { reliable: true });
+             if (addLog) addLog(`Guest registered. Dialing Host room: ${roomPeerId}...`);
+             // Force RAW serialization to bypass BinaryPack limits on mobile
+             const conn = guestPeer.connect(roomPeerId, { 
+                serialization: "raw", 
+                reliable: true 
+             });
              setupDataConnection(conn);
           });
           
           guestPeer.on('error', (guestErr: any) => {
-             console.error('Guest Peer error:', guestErr);
+             if (addLog) addLog(`Guest Peer error: ${guestErr.message}`);
           });
         } else {
-          console.error('Peer error:', err);
+          if (addLog) addLog(`PeerJS error: ${err.type}`);
         }
       });
       
@@ -232,12 +264,14 @@ export function useWebRTC(roomId: string) {
 
   const startBroadcast = useCallback((file: File) => {
     if (dataChannels.current.size === 0) {
-      console.warn('No peers connected to broadcast to.');
+      if (addLog) addLog('No peers connected to broadcast to.');
     }
 
     addActivity('file');
     const fileId = Math.random().toString(36).substring(2, 9);
     
+    if (addLog) addLog(`Starting broadcast for: ${file.name}`);
+
     const metadataMsg = JSON.stringify({
       type: 'FILE_START',
       fileId,
@@ -316,6 +350,7 @@ export function useWebRTC(roomId: string) {
           break;
           
         case 'COMPLETE':
+          if (addLog) addLog(`Broadcast chunking complete for ${file.name}.`);
           setTransfers(prev => prev.map(t => {
              if (t.id.includes(fileId)) {
                 return { ...t, status: 'complete', transferredSize: t.totalSize, speedBytesPerSecond: 0 };
@@ -327,7 +362,7 @@ export function useWebRTC(roomId: string) {
           break;
           
         case 'ERROR':
-          console.error('Worker error:', msg.error);
+          if (addLog) addLog(`Worker error chunking file: ${msg.error}`);
           setTransfers(prev => prev.map(t => {
              if (t.id.includes(fileId)) {
                 return { ...t, status: 'error' };
@@ -347,7 +382,7 @@ export function useWebRTC(roomId: string) {
       fileId
     } as WorkerMessage);
 
-  }, []);
+  }, [addLog]);
 
   const broadcastClipboard = useCallback((text: string) => {
     if (!text.trim()) return;

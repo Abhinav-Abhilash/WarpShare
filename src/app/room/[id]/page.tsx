@@ -1,129 +1,39 @@
 "use html";
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Copy, Check, Wifi, HardDrive, Shield, RefreshCw } from "lucide-react";
+import { Copy, Check, Wifi, HardDrive } from "lucide-react";
+import { useWebRTC } from "../../../hooks/useWebRTC";
+import { Dropzone } from "../../../components/broadcast/Dropzone";
+import { MeshTelemetry } from "../../../components/broadcast/MeshTelemetry";
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [peerId, setPeerId] = useState<string>("");
   const [status, setStatus] = useState<string>("Initializing mesh engine...");
   const [logs, setLogs] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   
-  const peerInstance = useRef<any>(null);
-  const connectionRef = useRef<any>(null);
-
   const addLog = (msg: string) => {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
+    // Also use the status label for simple top-level status
+    if (msg.includes("Connected") || msg.includes("secured") || msg.includes("tunnel")) {
+      setStatus("Connected!");
+    } else if (msg.includes("Waiting") || msg.includes("Host registered")) {
+      setStatus("Waiting for peers...");
+    } else if (msg.includes("Guest registered")) {
+      setStatus("Connecting to Host...");
+    } else if (msg.includes("Error") || msg.includes("failure")) {
+      setStatus("Connection Error");
+    }
   };
+
+  const { peers, transfers, startBroadcast, localId } = useWebRTC(params.id, addLog);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // PeerJS Host / Guest Engine
-  useEffect(() => {
-    if (!mounted) return;
-
-    const initPeer = async () => {
-      try {
-        const { Peer } = await import("peerjs");
-        const roomID = `warpshare-room-${params.id}`;
-        
-        // Google STUN configuration for mobile mDNS NAT traversal
-        const rtcConfig = {
-          host: "0.peerjs.com",
-          port: 443,
-          secure: true,
-          config: {
-            iceServers: [
-              // Primary STUN - Fast local Wi-Fi IP discovery
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-              { urls: "stun:stun.cloudflare.com:3478" },
-              // Free OpenRelay / Public Fallback TURN & STUN (Guarantees connection on strict routers)
-              { urls: "stun:openrelay.metered.ca:80" },
-              { 
-                urls: "turn:openrelay.metered.ca:80", 
-                username: "openrelayproject", 
-                credential: "openrelayproject" 
-              },
-              { 
-                urls: "turn:openrelay.metered.ca:443", 
-                username: "openrelayproject", 
-                credential: "openrelayproject" 
-              }
-            ],
-            iceCandidatePoolSize: 10,
-          },
-          debug: 2 // Enable warning logs to catch connection drops
-        };
-
-        setStatus("Connecting to Matchmaker broker...");
-        addLog("Attempting to open room as Host...");
-        
-        const peer = new Peer(roomID, rtcConfig);
-        peerInstance.current = peer;
-
-        peer.on("open", (id) => {
-          setPeerId(id);
-          setStatus("Waiting for peers...");
-          addLog(`Host registered successfully. Room ID active: ${id}`);
-        });
-
-        peer.on("connection", (conn) => {
-          connectionRef.current = conn;
-          setStatus("Connected!");
-          addLog(`Inbound connection secured from remote peer device!`);
-          
-          conn.on("data", (data: any) => {
-            addLog(`Payload chunk received: ${typeof data === "string" ? data : "Binary ArrayBuffer chunk"}`);
-          });
-        });
-
-        peer.on("error", (err) => {
-          // If room ID is already taken, this device is the Guest! Connect to Host.
-          if (err.type === "unavailable-id") {
-            addLog("Room Host detected! Switching to Guest Mode...");
-            const guestPeer = new Peer(rtcConfig);
-            peerInstance.current = guestPeer;
-
-            guestPeer.on("open", () => {
-              setStatus("Connecting to Host...");
-              addLog(`Guest registered. Dialing Host room: ${roomID}...`);
-              const conn = guestPeer.connect(roomID);
-              connectionRef.current = conn;
-
-              conn.on("open", () => {
-                setStatus("Connected!");
-                addLog("Established encrypted P2P tunnel directly to Room Host!");
-              });
-
-              conn.on("data", (data) => {
-                addLog(`Payload chunk received: ${typeof data === "string" ? data : "Binary ArrayBuffer chunk"}`);
-              });
-            });
-          } else {
-            addLog(`Network Alert: ${err.message}`);
-            setStatus("Connection Error");
-          }
-        });
-
-      } catch (error) {
-        addLog("Critical failure initializing WebRTC driver.");
-        setStatus("Driver Error");
-      }
-    };
-
-    initPeer();
-
-    return () => {
-      if (peerInstance.current) peerInstance.current.destroy();
-    };
-  }, [mounted, params.id]);
 
   const copyRoomLink = () => {
     if (typeof window === "undefined") return;
@@ -189,19 +99,8 @@ export default function RoomPage({ params }: { params: { id: string } }) {
                 </button>
               </div>
 
-              {/* Classic File Drop Zone */}
-              <div className="border-2 border-dashed border-border hover:border-accent/50 rounded-2xl p-10 sm:p-14 flex flex-col items-center justify-center text-center transition-all group bg-muted/5 cursor-pointer">
-                <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center text-muted-foreground group-hover:bg-accent/10 group-hover:text-accent transition-all mb-4 shadow-sm">
-                  <HardDrive className="h-6 w-6"/>
-                </div>
-                <p className="font-semibold text-sm sm:text-base text-foreground">Drag & drop asset files here</p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-relaxed">
-                  Files stream peer-to-peer over your local Wi-Fi router. Zero cloud storage overhead.
-                </p>
-                <div className="mt-5 px-4 py-2 bg-background border border-border rounded-xl text-xs font-semibold hover:bg-muted transition-all shadow-sm">
-                  Browse Files
-                </div>
-              </div>
+              {/* Classic File Drop Zone - REINTEGRATED WITH startBroadcast */}
+              <Dropzone onDrop={startBroadcast} />
 
             </div>
           </div>
@@ -217,7 +116,7 @@ export default function RoomPage({ params }: { params: { id: string } }) {
               </div>
               
               {/* Diagnostic Specs */}
-              <div className="bg-muted/30 border border-border rounded-xl p-3.5 space-y-2.5 text-xs">
+              <div className="bg-muted/30 border border-border rounded-xl p-3.5 space-y-2.5 text-xs mb-4">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Engine:</span>
                   <span className="font-mono font-semibold text-foreground">PeerJS WebRTC Mesh</span>
@@ -230,6 +129,15 @@ export default function RoomPage({ params }: { params: { id: string } }) {
                   <span className="text-muted-foreground">NAT Traversal:</span>
                   <span className="font-mono font-semibold text-green-500">Google STUN Active</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Serialization:</span>
+                  <span className="font-mono font-semibold text-purple-500">RAW Binary</span>
+                </div>
+              </div>
+
+              {/* Live Mesh Transfers - REINTEGRATED */}
+              <div className="mb-4">
+                <MeshTelemetry peers={peers} transfers={transfers} />
               </div>
 
               {/* Live Terminal Logs */}
