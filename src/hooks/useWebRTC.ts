@@ -4,7 +4,7 @@ import { WorkerMessage, WorkerResponse } from '../lib/types/worker';
 import { useKnowledgeTree } from './useKnowledgeTree';
 import { useSettings } from './useSettings';
 
-const BUFFER_THRESHOLD = 1024 * 1024; // 1MB
+const BUFFER_THRESHOLD = 65536; // 64KB (Prevents flooding mobile buffers)
 
 export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
   const { addActivity } = useKnowledgeTree();
@@ -141,39 +141,40 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
           const fileBuffer = receivedFiles.current.get(fileId);
           if (!fileBuffer) return;
           
-          let buffer: ArrayBuffer;
-          if (data instanceof Blob) {
-            // Unlikely with raw serialization in some browsers, but fallback
-            addLog && addLog('Received Blob instead of ArrayBuffer');
-            return;
-          } else {
-            buffer = (data instanceof Uint8Array ? data.buffer : data) as ArrayBuffer;
-          }
-          
-          fileBuffer.chunks.push(buffer);
-          fileBuffer.receivedBytes += buffer.byteLength;
-          
-          const isComplete = fileBuffer.receivedBytes === fileBuffer.totalSize;
-          let blobUrl: string | undefined;
-          
-          if (isComplete) {
-            const blob = new Blob(fileBuffer.chunks);
-            blobUrl = URL.createObjectURL(blob);
-            receivedFiles.current.delete(fileId);
-            if (addLog) addLog(`File download complete for: ${fileBuffer.fileName}`);
-          }
-          
-          setTransfers(prev => prev.map(t => {
-            if (t.id === `${fileId}-${targetId}`) {
-              return {
-                ...t,
-                transferredSize: fileBuffer.receivedBytes,
-                status: isComplete ? 'complete' : 'downloading',
-                ...(blobUrl ? { blobUrl } : {})
-              };
+          const processChunk = async () => {
+            let buffer: ArrayBuffer;
+            if (data instanceof Blob) {
+              buffer = await data.arrayBuffer();
+            } else {
+              buffer = (data instanceof Uint8Array ? data.buffer : data) as ArrayBuffer;
             }
-            return t;
-          }));
+            
+            fileBuffer.chunks.push(buffer);
+            fileBuffer.receivedBytes += buffer.byteLength;
+            
+            const isComplete = fileBuffer.receivedBytes === fileBuffer.totalSize;
+            let blobUrl: string | undefined;
+            
+            if (isComplete) {
+              const blob = new Blob(fileBuffer.chunks);
+              blobUrl = URL.createObjectURL(blob);
+              receivedFiles.current.delete(fileId);
+              if (addLog) addLog(`File download complete for: ${fileBuffer.fileName}`);
+            }
+            
+            setTransfers(prev => prev.map(t => {
+              if (t.id === `${fileId}-${targetId}`) {
+                return {
+                  ...t,
+                  transferredSize: fileBuffer.receivedBytes,
+                  status: isComplete ? 'complete' : 'downloading',
+                  ...(blobUrl ? { blobUrl } : {})
+                };
+              }
+              return t;
+            }));
+          };
+          processChunk();
         }
       });
     };
@@ -378,7 +379,7 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
     worker.postMessage({
       type: 'START',
       file,
-      chunkSize: 65536,
+      chunkSize: 16384, // 16KB is the maximum safe chunk size for iOS Safari WebRTC
       fileId
     } as WorkerMessage);
 
