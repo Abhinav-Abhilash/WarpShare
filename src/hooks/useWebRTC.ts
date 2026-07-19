@@ -70,17 +70,16 @@ export function useWebRTC(roomId: string) {
     };
   }, [transfers]);
 
-  // Helper to send to both channels
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Helper to send to WebSocket
   const broadcastSignal = useCallback((msg: any) => {
     const fullMsg = { ...msg, roomId } as SignalingMessage;
-    // Send via local BroadcastChannel
-    signalingChannel.current?.postMessage(fullMsg);
-    // Send via SSE to local Wi-Fi peers
-    fetch('/api/signaling/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(fullMsg)
-    }).catch(err => console.warn('SSE signaling send failed', err));
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(fullMsg));
+    } else {
+      console.warn('WebSocket not open, failed to send signaling message');
+    }
   }, [roomId]);
 
   // Setup Signaling
@@ -90,13 +89,8 @@ export function useWebRTC(roomId: string) {
     setLocalIdStr(localIdRef.current);
     const localId = localIdRef.current;
     
-    // 1. BroadcastChannel (Same machine / multi-tab)
-    const channel = new BroadcastChannel('warpshare-signaling-' + roomId);
-    signalingChannel.current = channel;
-
-    // 2. SSE EventSource (Local Wi-Fi Discovery)
-    let sseRetryTimeout: NodeJS.Timeout;
-    let eventSource: EventSource | null = null;
+    let wsRetryTimeout: NodeJS.Timeout;
+    let ws: WebSocket | null = null;
 
     const handleSignalingMessage = async (msg: any) => {
       if (msg.type === 'HEARTBEAT') return;
@@ -145,50 +139,50 @@ export function useWebRTC(roomId: string) {
       }
     };
 
-    channel.onmessage = (event) => handleSignalingMessage(event.data);
-
-    const connectSSE = (retryCount = 0) => {
-      if (eventSource) eventSource.close();
+    const connectWS = (retryCount = 0) => {
+      if (ws) ws.close();
       
-      eventSource = new EventSource(`/api/signaling/stream?clientId=${localId}&roomId=${roomId}`);
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?clientId=${localId}&roomId=${roomId}`);
+      wsRef.current = ws;
       
-      eventSource.onopen = () => {
+      ws.onopen = () => {
         retryCount = 0; // reset on success
+        
+        // Broadcast our presence
+        broadcastSignal({
+          type: 'PEER_DISCOVER',
+          senderId: localId,
+          name: settingsRef.current.displayName,
+          deviceType: settingsRef.current.deviceType
+        });
       };
 
-      eventSource.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
           handleSignalingMessage(msg);
         } catch (err) {
-          console.error('Failed to parse SSE message:', err);
+          console.error('Failed to parse WebSocket message:', err);
         }
       };
 
-      eventSource.onerror = () => {
-        eventSource?.close();
+      ws.onclose = () => {
         const timeout = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30 seconds
-        sseRetryTimeout = setTimeout(() => connectSSE(retryCount + 1), timeout);
+        wsRetryTimeout = setTimeout(() => connectWS(retryCount + 1), timeout);
+      };
+      
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
       };
     };
 
-    connectSSE();
-
-    // Broadcast our presence
-    setTimeout(() => {
-      broadcastSignal({
-        type: 'PEER_DISCOVER',
-        senderId: localId,
-        name: settingsRef.current.displayName,
-        deviceType: settingsRef.current.deviceType
-      });
-    }, 500);
+    connectWS();
 
     return () => {
       broadcastSignal({ type: 'PEER_LEAVE', senderId: localId });
-      channel.close();
-      if (eventSource) eventSource.close();
-      clearTimeout(sseRetryTimeout);
+      if (ws) ws.close();
+      clearTimeout(wsRetryTimeout);
       peerConnections.current.forEach(pc => pc.close());
       peerConnections.current.clear();
       dataChannels.current.clear();
@@ -202,8 +196,9 @@ export function useWebRTC(roomId: string) {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun.cloudflare.com:3478' }
-      ]
+        { urls: 'stun:stun2.l.google.com:19302' },
+      ],
+      iceCandidatePoolSize: 10,
     });
 
     pc.onicecandidate = (event) => {
