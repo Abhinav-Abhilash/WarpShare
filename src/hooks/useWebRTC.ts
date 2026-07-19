@@ -69,12 +69,26 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
     setLocalIdStr(localIdRef.current);
     let isMounted = true;
 
+    const logPrefix = () => `[${new Date().toISOString()}]`;
+
     const setupDataConnection = (conn: any) => {
       const targetId = conn.peer;
 
+      if (conn.peerConnection) {
+        conn.peerConnection.oniceconnectionstatechange = () => {
+          if (addLog) addLog(`${logPrefix()} [ICE] State change with ${targetId}: ${conn.peerConnection.iceConnectionState}`);
+        };
+      }
+
       conn.on('open', () => {
-        if (addLog) addLog(`DataConnection secured with peer: ${targetId}`);
+        if (addLog) addLog(`${logPrefix()} [CONN] DataConnection OPENED with peer: ${targetId}`);
         dataChannels.current.set(targetId, conn);
+        
+        if (conn.peerConnection && !conn.peerConnection.oniceconnectionstatechange) {
+           conn.peerConnection.oniceconnectionstatechange = () => {
+             if (addLog) addLog(`${logPrefix()} [ICE] State change with ${targetId}: ${conn.peerConnection.iceConnectionState}`);
+           };
+        }
         
         // Exchange UI info
         conn.send(JSON.stringify({
@@ -94,8 +108,13 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
         }
       });
 
+      conn.on('error', (err: any) => {
+        console.error(`${logPrefix()} [CONN ERROR] Peer ${targetId}:`, err);
+        if (addLog) addLog(`${logPrefix()} [CONN ERROR] Peer ${targetId}: ${err?.message || err}`);
+      });
+
       conn.on('close', () => {
-        if (addLog) addLog(`DataConnection closed with peer: ${targetId}`);
+        if (addLog) addLog(`${logPrefix()} [CONN] DataConnection CLOSED with peer: ${targetId}`);
         setPeers(prev => prev.filter(p => p.id !== targetId));
         dataChannels.current.delete(targetId);
       });
@@ -193,38 +212,58 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
             { urls: "stun:stun.cloudflare.com:3478" },
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" },
-            { urls: "stun:global.stun.twilio.com:3478" }
+            { urls: "stun:global.stun.twilio.com:3478" },
+            { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+            { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+            { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
           ],
           iceCandidatePoolSize: 10,
           sdpSemantics: "unified-plan",
           iceTransportPolicy: "all",
         },
-        debug: 1
+        debug: 3
       };
 
-      if (addLog) addLog('Initializing WebRTC engine...');
+      if (addLog) addLog(`${logPrefix()} Initializing WebRTC engine with TURN support...`);
 
       let p = new PeerModule(roomPeerId, config);
       
       p.on('open', (id: string) => {
         if (!isMounted) return;
-        if (addLog) addLog(`Opened as Room Host: ${id}`);
-        
-        p.on('connection', (conn: any) => {
-          if (addLog) addLog('Inbound connection received! Securing DataChannel...');
-          setupDataConnection(conn);
-        });
+        if (addLog) addLog(`${logPrefix()} [HOST] Opened as Room Host: ${id}`);
+      });
+      
+      p.on('connection', (conn: any) => {
+        if (addLog) addLog(`${logPrefix()} [HOST] Inbound connection received from ${conn.peer}! Securing DataChannel...`);
+        setupDataConnection(conn);
+      });
+      
+      p.on('call', () => {
+        if (addLog) addLog(`${logPrefix()} [HOST] Incoming call received (ignored, data only)`);
+      });
+      
+      p.on('disconnected', () => {
+        if (addLog) addLog(`${logPrefix()} [HOST] Disconnected from signaling server.`);
+      });
+      
+      p.on('close', () => {
+        if (addLog) addLog(`${logPrefix()} [HOST] Peer destroyed/closed.`);
       });
 
       p.on('error', (err: any) => {
         if (!isMounted) return;
+        console.error(`${logPrefix()} [HOST ERROR]:`, err);
         if (err.type === 'unavailable-id') {
-          if (addLog) addLog('Room taken, initializing as Guest Mode...');
+          if (addLog) addLog(`${logPrefix()} Room taken, destroying Host peer and initializing as Guest...`);
+          
+          // CRITICAL FIX: Destroy the failing peer to prevent race conditions and duplicate WebSockets
+          p.destroy();
+          
           const guestPeer = new PeerModule(config);
           peerRef.current = guestPeer;
           
           guestPeer.on('open', (guestId: string) => {
-             if (addLog) addLog(`Guest registered. Dialing Host room: ${roomPeerId}...`);
+             if (addLog) addLog(`${logPrefix()} [GUEST] Registered with ID: ${guestId}. Dialing Host room: ${roomPeerId}...`);
              // Force RAW serialization to bypass BinaryPack limits on mobile
              const conn = guestPeer.connect(roomPeerId, { 
                 serialization: "raw", 
@@ -233,11 +272,25 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
              setupDataConnection(conn);
           });
           
+          guestPeer.on('connection', (conn: any) => {
+             if (addLog) addLog(`${logPrefix()} [GUEST] Unexpected inbound connection from ${conn.peer}.`);
+             setupDataConnection(conn);
+          });
+          
+          guestPeer.on('disconnected', () => {
+            if (addLog) addLog(`${logPrefix()} [GUEST] Disconnected from signaling server.`);
+          });
+          
+          guestPeer.on('close', () => {
+            if (addLog) addLog(`${logPrefix()} [GUEST] Peer destroyed/closed.`);
+          });
+          
           guestPeer.on('error', (guestErr: any) => {
-             if (addLog) addLog(`Guest Peer error: ${guestErr.message}`);
+             console.error(`${logPrefix()} [GUEST ERROR]:`, guestErr);
+             if (addLog) addLog(`${logPrefix()} [GUEST ERROR] ${guestErr.type}: ${guestErr.message}`);
           });
         } else {
-          if (addLog) addLog(`PeerJS error: ${err.type}`);
+          if (addLog) addLog(`${logPrefix()} [HOST ERROR] ${err.type}: ${err.message}`);
         }
       });
       
