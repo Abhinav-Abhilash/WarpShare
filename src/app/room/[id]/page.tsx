@@ -7,6 +7,7 @@ import { Copy, Check, Wifi, HardDrive } from "lucide-react";
 import { useWebRTC } from "../../../hooks/useWebRTC";
 import { Dropzone } from "../../../components/broadcast/Dropzone";
 import { MeshTelemetry } from "../../../components/broadcast/MeshTelemetry";
+import RoomQRCode from "../../../components/RoomQRCode";
 
 export default function RoomPage({ params }: { params: { id: string } }) {
   const { theme, setTheme } = useTheme();
@@ -90,13 +91,16 @@ export default function RoomPage({ params }: { params: { id: string } }) {
                   <p className="text-xs text-muted-foreground mt-1.5">Open this exact page on your phone or PC to link instantly.</p>
                 </div>
                 
-                <button
-                  onClick={copyRoomLink}
-                  className="inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-accent-foreground px-4 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all shadow-sm cursor-pointer shrink-0"
-                >
-                  {copied ? <Check className="h-4 w-4 text-green-300"/> : <Copy className="h-4 w-4"/>}
-                  {copied ? "Copied Link!" : "Copy Room Link"}
-                </button>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <RoomQRCode roomId={params.id} />
+                  <button
+                    onClick={copyRoomLink}
+                    className="inline-flex items-center justify-center gap-2 bg-accent hover:bg-accent/90 text-accent-foreground px-4 py-2.5 rounded-xl font-medium text-xs sm:text-sm transition-all shadow-sm cursor-pointer shrink-0"
+                  >
+                    {copied ? <Check className="h-4 w-4 text-green-300"/> : <Copy className="h-4 w-4"/>}
+                    {copied ? "Copied Link!" : "Copy Room Link"}
+                  </button>
+                </div>
               </div>
 
               {/* Classic File Drop Zone - REINTEGRATED WITH startBroadcast */}

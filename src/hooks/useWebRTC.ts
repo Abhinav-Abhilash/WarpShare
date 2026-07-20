@@ -3,6 +3,7 @@ import { Peer, FileTransfer, ClipboardEntry } from '../lib/types/network';
 import { WorkerMessage, WorkerResponse } from '../lib/types/worker';
 import { useKnowledgeTree } from './useKnowledgeTree';
 import { useSettings } from './useSettings';
+import { sounds } from '../lib/soundEffects';
 
 const BUFFER_THRESHOLD = 65536; // 64KB (Prevents flooding mobile buffers)
 
@@ -83,6 +84,7 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
       conn.on('open', () => {
         if (addLog) addLog(`${logPrefix()} [CONN] DataConnection OPENED with peer: ${targetId}`);
         dataChannels.current.set(targetId, conn);
+        sounds.playConnect();
         
         if (conn.peerConnection && !conn.peerConnection.oniceconnectionstatechange) {
            conn.peerConnection.oniceconnectionstatechange = () => {
@@ -178,6 +180,7 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
               const blob = new Blob(fileBuffer.chunks);
               blobUrl = URL.createObjectURL(blob);
               receivedFiles.current.delete(fileId);
+              sounds.playSuccess();
               if (addLog) addLog(`File download complete for: ${fileBuffer.fileName}`);
             }
             
@@ -397,6 +400,7 @@ export function useWebRTC(roomId: string, addLog?: (msg: string) => void) {
           
         case 'COMPLETE':
           if (addLog) addLog(`Broadcast chunking complete for ${file.name}.`);
+          sounds.playSuccess();
           setTransfers(prev => prev.map(t => {
              if (t.id.includes(fileId)) {
                 return { ...t, status: 'complete', transferredSize: t.totalSize, speedBytesPerSecond: 0 };
