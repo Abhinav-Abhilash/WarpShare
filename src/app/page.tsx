@@ -6,6 +6,7 @@ import { RoomBroadcast } from '@/components/broadcast/RoomBroadcast';
 import { Clipboard } from '@/components/broadcast/Clipboard';
 import { KnowledgeTree } from '@/components/knowledge/KnowledgeTree';
 import { Settings } from '@/components/settings/Settings';
+import RoomQRCode from '@/components/RoomQRCode';
 import { useWebRTC } from '@/hooks/useWebRTC';
 import { Copy, Check } from 'lucide-react';
 
@@ -67,22 +68,25 @@ export default function Home() {
             </div>
           </div>
           
-          <button
-            onClick={handleCopyRoom}
-            className="flex items-center justify-center gap-2 px-3 py-1.5 w-full sm:w-auto text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
-          >
-            {copiedRoomId ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="text-emerald-600 dark:text-emerald-400">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5" />
-                Copy Room Link
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <RoomQRCode roomId={roomId} />
+            <button
+              onClick={handleCopyRoom}
+              className="flex items-center justify-center gap-2 px-3 py-1.5 w-full sm:w-auto text-xs font-medium text-zinc-600 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full transition-colors"
+            >
+              {copiedRoomId ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="text-emerald-600 dark:text-emerald-400">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Room Link
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Dynamic Canvas */}
